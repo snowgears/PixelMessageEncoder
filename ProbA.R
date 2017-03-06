@@ -1,3 +1,4 @@
+# Required libries
 library(pixmap)
 
 # Encoder
@@ -15,7 +16,7 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
     
     # Split string and convert to doubles
     # Vectorized since utf8ToInt() returns a vector if string is inputed
-    str_val <- utf8ToInt(msg) / 128
+    str_val <- as.double(utf8ToInt(msg) / 128)
     str_val <- c(str_val, 0)
     
     # Encode
@@ -38,19 +39,28 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
 {
     img <- read.pnm(imagefilename)
     msg_mat <- img@grey
-    size <- length(msg_mat)
     
-    idx_arr <- seq(startpix, size, stride)
-    msg_vals <- msg_mat[idx_arr]
-    nul_idx <- which(msg_vals == 0)
+    # Does one loop iteration outside of while loop before starting loop
+    idx <- startpix
+    val <- msg_mat[idx]
+    msg_vals <- val # Start vector with numeric values from the matrix
     
-    # nul_idx can have more than one index, so since everything
-    # in R is a vector, I can access the first instance of 0 reguardless
-    # of how many 0's I pick up
-    print(nul_idx)
-    msg_vals <- msg_vals[1:(nul_idx[1] - 1)]
-    msg_vals <- msg_vals * 128
+    # Keep looping until 0 is found (0 is null terminator)
+    while (val != 0) {
+        idx <- idx + stride
+        val <- msg_mat[idx]
+        msg_vals <- c(msg_vals, val)
+    }
     
-    msg <- intToUtf8(as.integer(msg_vals), multiple=TRUE)
+    
+    # Revert from floats back to ints for Utf8 conversion
+    # While loop which picks up message takes the null terminator,
+    # so I remove it by doing msg_vals[,-1]
+    msg_vals <- as.integer(msg_vals[-length(msg_vals)] * 128)
+    
+    # FLOATING POINT BUG? FIX LATER
+    msg <- intToUtf8(msg_vals, multiple=TRUE)
     print(msg)
+    
+    return(msg)
 }

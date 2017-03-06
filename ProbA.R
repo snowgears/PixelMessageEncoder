@@ -16,8 +16,9 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
     
     # Split string and convert to doubles
     # Vectorized since utf8ToInt() returns a vector if string is inputed
-    str_val <- as.double(utf8ToInt(msg) / 128)
+    str_val <- as.double(utf8ToInt(msg)) / 128.0
     str_val <- c(str_val, 0)
+    print(str_val)
     
     # Encode
     j <- 1
@@ -56,7 +57,8 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
     # Revert from floats back to ints for Utf8 conversion
     # While loop which picks up message takes the null terminator,
     # so I remove it by doing msg_vals[,-1]
-    msg_vals <- as.integer(msg_vals[-length(msg_vals)] * 128)
+    print(msg_vals[-length(msg_vals)] * 128)
+    msg_vals <- round(msg_vals[-length(msg_vals)] * 128)
     
     # FLOATING POINT BUG? FIX LATER
     msg <- intToUtf8(msg_vals, multiple=TRUE)

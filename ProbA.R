@@ -67,35 +67,13 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
             stop()
         }
         
-        # Make a vector of bools to check if a specific pixel
-        # has been overwritten or not
-        written <- vector(length = size)
-        new_idx <- vector('numeric')
-        
-        # Loop to check repeated indices
-        for (i in idx) {
-            if (!written[i]) {
-                new_idx <- c(new_idx, i)
-                written[i] <- TRUE
-            } # Check if element is written
-            else {
-                # Iterate to the unwritten value
-                while(written[i]) {
-                    i <- i + stride
-                    if (i > size) # Loop back to beginning
-                       i <- i - size
-                }
-                
-                new_idx <- c(new_idx, i)
-                written[i] <- TRUE
-            }
-        }
-        
         # Create a vector for consec
         consec_idx <- vector('numeric')
         written <- vector(length = size)
         
-        for (i in new_idx) {
+        # Loop checks 1) double writing
+        #             2) if a pixel is within consec of another
+        for (i in idx) {
             # Counter is needed to stop code if infinite loop
             # is encountered while trying to encode the message
             ctr <- 0
@@ -160,6 +138,12 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
     size <- ncol(msg_mat) * nrow(msg_mat)
     row <- nrow(msg_mat)
     
+    # Check if image loaded properly
+    if (is.null(img)) {
+        warning("Image not loaded correctly!")
+        stop()
+    }
+    
     if (is.null(consec)) {
         # Does one loop iteration outside of while loop before starting loop
         idx <- startpix
@@ -193,23 +177,23 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
         val <- msg_mat[idx]
         msg_vals <- val # Start vector with numeric values from the matrix
         
-        # Generate invalid positions
-        l_bound <- seq(idx, idx - row * consec, -row)
-        r_bound <- seq(idx, idx + row * consec, row)
-        u_bound <- startpix:(idx - consec)
-        d_bound <- startpix:(idx + consec)
-        
-        ## Handle edge cases
-        l_bound <- ifelse(l_bound <= 0, l_bound + size, l_bound)
-        r_bound <- ifelse(r_bound > size, r_bound - size, r_bound)
-        u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
-        d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
-        
-        # Add read values
-        true_idx <- c(l_bound, r_bound, u_bound, d_bound)
-        read[true_idx] <- TRUE
-        
         while (val != 0) {
+            # Generate invalid positions from the previous iteration
+            l_bound <- seq(idx, idx - row * consec, -row)
+            r_bound <- seq(idx, idx + row * consec, row)
+            u_bound <- startpix:(idx - consec)
+            d_bound <- startpix:(idx + consec)
+            
+            ## Handle edge cases
+            l_bound <- ifelse(l_bound <= 0, l_bound + size, l_bound)
+            r_bound <- ifelse(r_bound > size, r_bound - size, r_bound)
+            u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
+            d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
+            
+            # Append to read vector
+            true_idx <- c(l_bound, r_bound, u_bound, d_bound)
+            read[true_idx] <- TRUE
+            
             # Advance idx to next location
             idx <- idx + stride 
             if (idx > size) 
@@ -226,22 +210,6 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
             # Append to message vector
             val <- msg_mat[idx]
             msg_vals <- c(msg_vals, val)
-            
-            # Generate invalid positions
-            l_bound <- seq(idx, idx - row * consec, -row)
-            r_bound <- seq(idx, idx + row * consec, row)
-            u_bound <- startpix:(idx - consec)
-            d_bound <- startpix:(idx + consec)
-            
-            ## Handle edge cases
-            l_bound <- ifelse(l_bound <= 0, l_bound + size, l_bound)
-            r_bound <- ifelse(r_bound > size, r_bound - size, r_bound)
-            u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
-            d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
-            
-            # Append to read vector
-            true_idx <- c(l_bound, r_bound, u_bound, d_bound)
-            read[true_idx] <- TRUE
         }
     } # consec is not NULL
     

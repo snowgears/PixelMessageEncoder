@@ -64,24 +64,25 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
         # Make a vector of bools to check if a specific pixel
         # has been overwritten or not
         written <- vector(length = size)
-        j <- 1
+        new_idx <- vector('numeric')
+        
         for (i in idx) {
             if (!written[i]) {
-                print(i)
-                grey_img[i] <- str_val[j]
+                new_idx <- c(new_idx, i)
                 written[i] <- TRUE
-            }
+            } # Check if element is written
             else {
-                while (written[i] == TRUE) {
+                # Iterate to the unwritten value
+                while(written[i])
                     i <- i + stride
-                }
-                print(i)
-                grey_img[i] <- str_val[j]
+                
+                new_idx <- c(new_idx, i)
                 written[i] <- TRUE
             }
-            j <- j + 1
         }
         
+        # Set the values
+        grey_img[new_idx] <- str_val
         
             #l_bound <- seq(i, i - row * consec, -row)
             #r_bound <- seq(i, i + row * consec, row)
@@ -128,9 +129,9 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
         while (val != 0) {
             idx <- idx + stride
             # If statement to wrap around the image when needed
-            if (idx > size) {
+            if (idx > size) 
                 idx <- idx - size
-            }
+            
             val <- msg_mat[idx]
             msg_vals <- c(msg_vals, val)
         }
@@ -143,6 +144,8 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
         }
         
         written <- vector(length=size)
+        
+        # Get the first value
         idx <- startpix
         val <- msg_mat[idx]
         msg_vals <- val # Start vector with numeric values from the matrix
@@ -151,19 +154,17 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
         while (val != 0) {
             # Advance idx to next location
             idx <- idx + stride 
-            if (idx > size) {
+            if (idx > size) 
                 idx <- idx - size
-            }
+            
             # If written is true, than we already read the pixel, so we
             # need to advance to the next stride
             while (written[idx]) {
                 idx <- idx + stride 
-                if (idx > size) {
+                if (idx > size)
                     idx <- idx - size
-                }
             }
             
-            print(idx)
             val <- msg_mat[idx]
             msg_vals <- c(msg_vals, val)
             written[idx] <- TRUE

@@ -30,7 +30,7 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
     # Check if stride is relatively prime to image size
     # Relatively prime means 2 ints have gcd(a, b) = 1.
     size <- ncol(grey_img) * nrow(grey_img)
-    #row <- nrow(grey_img)
+    row <- nrow(grey_img)
     
     if (euclid(stride, size) != 1) {
         warning("Stride not relatively prime to image size!")
@@ -73,27 +73,53 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
             } # Check if element is written
             else {
                 # Iterate to the unwritten value
-                while(written[i])
+                while(written[i]) {
                     i <- i + stride
+                    if (i > size)
+                       i <- i - size
+                }
                 
                 new_idx <- c(new_idx, i)
                 written[i] <- TRUE
             }
         }
         
+        # Create a vector for consec
+        consec_idx <- vector('numeric')
+        written <- vector(length = size)
+        
+        for (i in new_idx) {
+            while(written[i]) {
+                i <- i + stride
+                if (i > size)
+                    i <- i - size
+            }
+            
+            consec_idx <- c(consec_idx, i)
+            
+            # Generate invalid positions
+            l_bound <- seq(i, i - row * consec, -row)
+            r_bound <- seq(i, i + row * consec, row)
+            u_bound <- startpix:(i - consec)
+            d_bound <- startpix:(i + consec)
+            
+            ## Handle edge cases
+            l_bound <- ifelse(l_bound <= 0, l_bound + size, l_bound)
+            r_bound <- ifelse(r_bound > size, r_bound - size, r_bound)
+            u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
+            d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
+            
+            written[i] <- TRUE
+            written[l_bound] <- TRUE 
+            written[r_bound] <- TRUE 
+            written[u_bound] <- TRUE 
+            written[d_bound] <- TRUE 
+        }
+        
+        print(consec_idx)
+        
         # Set the values
         grey_img[new_idx] <- str_val
-        
-            #l_bound <- seq(i, i - row * consec, -row)
-            #r_bound <- seq(i, i + row * consec, row)
-            #u_bound <- startpix:(i - consec)
-            #d_bound <- startpix:(i + consec)
-            #
-            #l_bound <- ifelse(l_bound <= 0, l_bound + size, l_bound)
-            #r_bound <- ifelse(r_bound > size, r_bound - size, r_bound)
-            #u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
-            #d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
-        
     } # consec is not NULL
     
     # Overwrite grey in image and save to disc
@@ -118,6 +144,7 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
     img <- read.pnm(imagefilename)
     msg_mat <- img@grey
     size <- ncol(msg_mat) * nrow(msg_mat)
+    row <- nrow(msg_mat)
     
     if (is.null(consec)) {
         # Does one loop iteration outside of while loop before starting loop
@@ -149,9 +176,28 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
         idx <- startpix
         val <- msg_mat[idx]
         msg_vals <- val # Start vector with numeric values from the matrix
-        written[idx] <- TRUE
+        
+        # Generate invalid positions
+        l_bound <- seq(idx, idx - row * consec, -row)
+        r_bound <- seq(idx, idx + row * consec, row)
+        u_bound <- startpix:(idx - consec)
+        d_bound <- startpix:(idx + consec)
+        
+        ## Handle edge cases
+        l_bound <- ifelse(l_bound <= 0, l_bound + size, l_bound)
+        r_bound <- ifelse(r_bound > size, r_bound - size, r_bound)
+        u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
+        d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
+        
+        written[i] <- TRUE
+        written[l_bound] <- TRUE 
+        written[r_bound] <- TRUE 
+        written[u_bound] <- TRUE 
+        written[d_bound] <- TRUE 
         
         while (val != 0) {
+            print(idx)
+            
             # Advance idx to next location
             idx <- idx + stride 
             if (idx > size) 
@@ -167,7 +213,24 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
             
             val <- msg_mat[idx]
             msg_vals <- c(msg_vals, val)
-            written[idx] <- TRUE
+            
+            # Generate invalid positions
+            l_bound <- seq(idx, idx - row * consec, -row)
+            r_bound <- seq(idx, idx + row * consec, row)
+            u_bound <- startpix:(idx - consec)
+            d_bound <- startpix:(idx + consec)
+            
+            ## Handle edge cases
+            l_bound <- ifelse(l_bound <= 0, l_bound + size, l_bound)
+            r_bound <- ifelse(r_bound > size, r_bound - size, r_bound)
+            u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
+            d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
+            
+            written[i] <- TRUE
+            written[l_bound] <- TRUE 
+            written[r_bound] <- TRUE 
+            written[u_bound] <- TRUE 
+            written[d_bound] <- TRUE 
         }
     } # consec is not NULL
     

@@ -27,6 +27,12 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
     img <- read.pnm(imagefilename)
     grey_img <- img@grey
     
+    # Check if image loaded properly
+    if (is.null(img)) {
+        warning("Image not loaded correctly!")
+        stop()
+    }
+    
     # Check if stride is relatively prime to image size
     # Relatively prime means 2 ints have gcd(a, b) = 1.
     size <- ncol(grey_img) * nrow(grey_img)
@@ -66,6 +72,7 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
         written <- vector(length = size)
         new_idx <- vector('numeric')
         
+        # Loop to check repeated indices
         for (i in idx) {
             if (!written[i]) {
                 new_idx <- c(new_idx, i)
@@ -75,7 +82,7 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
                 # Iterate to the unwritten value
                 while(written[i]) {
                     i <- i + stride
-                    if (i > size)
+                    if (i > size) # Loop back to beginning
                        i <- i - size
                 }
                 
@@ -89,10 +96,21 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
         written <- vector(length = size)
         
         for (i in new_idx) {
+            # Counter is needed to stop code if infinite loop
+            # is encountered while trying to encode the message
+            ctr <- 0
             while(written[i]) {
                 i <- i + stride
-                if (i > size)
+                ctr <- ctr + stride
+                if (i > size) # Loop back to beginning
                     i <- i - size
+                if (ctr > size * stride) {
+                    # While loop gives stride sweeps through the matrix before
+                    # Exiting with a warning
+                    warning("Exceeded stride number of sweeps through matrix")
+                    warning("Not enough room for message!")
+                    stop()
+                }
             }
             
             consec_idx <- c(consec_idx, i)
@@ -109,17 +127,13 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
             u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
             d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
             
-            written[i] <- TRUE
-            written[l_bound] <- TRUE 
-            written[r_bound] <- TRUE 
-            written[u_bound] <- TRUE 
-            written[d_bound] <- TRUE 
+            # Append consec bounds to written array
+            true_idx  <- c(l_bound, r_bound, u_bound, d_bound)
+            written[true_idx] <- TRUE
         }
         
-        print(consec_idx)
-        
         # Set the values
-        grey_img[new_idx] <- str_val
+        grey_img[consec_idx] <- str_val
     } # consec is not NULL
     
     # Overwrite grey in image and save to disc
@@ -170,9 +184,11 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
             stop()
         }
         
-        written <- vector(length=size)
+        # Vector which tracks positions which are read
+        read <- vector(length=size)
         
         # Get the first value
+        # Needed to do outside of loop in order to get things going
         idx <- startpix
         val <- msg_mat[idx]
         msg_vals <- val # Start vector with numeric values from the matrix
@@ -189,15 +205,11 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
         u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
         d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
         
-        written[i] <- TRUE
-        written[l_bound] <- TRUE 
-        written[r_bound] <- TRUE 
-        written[u_bound] <- TRUE 
-        written[d_bound] <- TRUE 
+        # Add read values
+        true_idx <- c(l_bound, r_bound, u_bound, d_bound)
+        read[true_idx] <- TRUE
         
         while (val != 0) {
-            print(idx)
-            
             # Advance idx to next location
             idx <- idx + stride 
             if (idx > size) 
@@ -205,12 +217,13 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
             
             # If written is true, than we already read the pixel, so we
             # need to advance to the next stride
-            while (written[idx]) {
+            while (read[idx]) {
                 idx <- idx + stride 
                 if (idx > size)
                     idx <- idx - size
             }
             
+            # Append to message vector
             val <- msg_mat[idx]
             msg_vals <- c(msg_vals, val)
             
@@ -226,11 +239,9 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
             u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
             d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
             
-            written[i] <- TRUE
-            written[l_bound] <- TRUE 
-            written[r_bound] <- TRUE 
-            written[u_bound] <- TRUE 
-            written[d_bound] <- TRUE 
+            # Append to read vector
+            true_idx <- c(l_bound, r_bound, u_bound, d_bound)
+            read[true_idx] <- TRUE
         }
     } # consec is not NULL
     

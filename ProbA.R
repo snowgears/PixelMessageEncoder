@@ -30,6 +30,8 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
     # Check if stride is relatively prime to image size
     # Relatively prime means 2 ints have gcd(a, b) = 1.
     size <- ncol(grey_img) * nrow(grey_img)
+    #row <- nrow(grey_img)
+    
     if (euclid(stride, size) != 1) {
         warning("Stride not relatively prime to image size!")
         stop()
@@ -40,24 +42,56 @@ secretencoder <- function(imagefilename, msg, startpix, stride, consec=NULL)
     str_val <- as.double(utf8ToInt(msg)) / 128.0
     str_val <- c(str_val, 0) # Add null terminator
     
+    # Generate a sequencce of indices to store into grey_img.
+    # Note that the lengh(str_val) - 1 is needed becaise seq
+    # generates [start, end], so I need 1 less
+    max_idx <- startpix + (stride * length(str_val) - 1)
+    idx <- seq(startpix, max_idx, stride)
+    # ifelse() used to create a set of indices which wraps around the matrix
+    idx <- ifelse(idx < size, idx, idx - size * floor(idx / size))
+    
     if (is.null(consec)) {
         # Encode
-        # Generate a sequencce of indices to store into grey_img.
-        # Note that the lengh(str_val) - 1 is needed becaise seq
-        # generates [start, end], so I need 1 less
-        max_idx <- startpix + (stride * length(str_val) - 1)
-        encode_idx <- seq(startpix, max_idx, stride)
-        # ifelse() used to create a set of indices which wraps around the matrix
-        encode_idx <- ifelse(encode_idx < size, encode_idx, encode_idx - size)
-        grey_img[encode_idx] <- str_val
-        
-        print(encode_idx)
+        grey_img[idx] <- str_val
     } # consec is NULL
     else {
+        # Check if consec is positive
         if (consec <= 0) {
-            print("Consec should be positive!")
+            warning("Consec should be positive!")
             stop()
         }
+        
+        # Make a vector of bools to check if a specific pixel
+        # has been overwritten or not
+        written <- vector(length = size)
+        j <- 1
+        for (i in idx) {
+            if (!written[i]) {
+                print(i)
+                grey_img[i] <- str_val[j]
+                written[i] <- TRUE
+            }
+            else {
+                while (written[i] == TRUE) {
+                    i <- i + stride
+                }
+                print(i)
+                grey_img[i] <- str_val[j]
+                written[i] <- TRUE
+            }
+            j <- j + 1
+        }
+        
+        
+            #l_bound <- seq(i, i - row * consec, -row)
+            #r_bound <- seq(i, i + row * consec, row)
+            #u_bound <- startpix:(i - consec)
+            #d_bound <- startpix:(i + consec)
+            #
+            #l_bound <- ifelse(l_bound <= 0, l_bound + size, l_bound)
+            #r_bound <- ifelse(r_bound > size, r_bound - size, r_bound)
+            #u_bound <- ifelse(u_bound <= 0, u_bound + size, u_bound)
+            #d_bound <- ifelse(d_bound > size, d_bound - size, d_bound)
         
     } # consec is not NULL
     
@@ -100,11 +134,6 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
             val <- msg_mat[idx]
             msg_vals <- c(msg_vals, val)
         }
-        
-        # Revert from floats back to ints for Utf8 conversion. Rounding is necessary
-        # While loop which picks up message takes the null terminator,
-        # so I remove it by doing msg_vals[,-1]
-        msg_vals <- round(msg_vals[-length(msg_vals)] * 128)
     } # consec is NULL
     else {
         # Check if consec is positive
@@ -112,7 +141,39 @@ secretdecoder <- function(imagefilename, startpix, stride, consec=NULL)
             print("Consec should be positive!")
             stop()
         }
+        
+        written <- vector(length=size)
+        idx <- startpix
+        val <- msg_mat[idx]
+        msg_vals <- val # Start vector with numeric values from the matrix
+        written[idx] <- TRUE
+        
+        while (val != 0) {
+            # Advance idx to next location
+            idx <- idx + stride 
+            if (idx > size) {
+                idx <- idx - size
+            }
+            # If written is true, than we already read the pixel, so we
+            # need to advance to the next stride
+            while (written[idx]) {
+                idx <- idx + stride 
+                if (idx > size) {
+                    idx <- idx - size
+                }
+            }
+            
+            print(idx)
+            val <- msg_mat[idx]
+            msg_vals <- c(msg_vals, val)
+            written[idx] <- TRUE
+        }
     } # consec is not NULL
+    
+    # Revert from floats back to ints for Utf8 conversion. Rounding is necessary
+    # While loop which picks up message takes the null terminator,
+    # so I remove it by doing msg_vals[,-1]
+    msg_vals <- round(msg_vals[-length(msg_vals)] * 128)
     
     # Decode message.
     if (length(msg_vals) == 1) # Special case, encode 1 chracter
